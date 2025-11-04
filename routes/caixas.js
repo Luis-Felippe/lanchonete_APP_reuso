@@ -6,45 +6,8 @@ require('../models/Receita')
 const Caixa = mongoose.model("caixas")
 const Receita = mongoose.model("receitas")
 const {checarAdmin} = require('../config/checarAdmin')
+const { maskPrice, maskDateDDMMYYYY } = require('../utils/formatters')
 const timezoneOffset = 180;
-
-function mascaraDePreco(preco) {
-    stringPreco = preco.toString().replace('.', ',')
-    var i = stringPreco.indexOf(",")
-    tamanho = stringPreco.length
-    var substringPreco
-    if(i == -1){
-        stringPreco = stringPreco.concat(",00")
-    }else{  
-        substringPreco = stringPreco.substr(i+1, tamanho)
-        if(substringPreco.length < 2){
-            stringPreco = stringPreco.concat("0")
-        }
-    }
-    return stringPreco
-}
-
-function mascaraData(data){
-    partesData = data.split("-")
-    var novaData
-    
-    if(partesData[0].length == 1){
-        novaData = "0" + partesData[0]
-    }else{
-        novaData = partesData[0]
-    }
-
-    novaData = novaData + "/"
-
-    if(partesData[1].length == 1){
-        novaData = novaData + "0" + partesData[1]         
-    }else{
-        novaData = novaData + partesData[1]
-    }
-
-    novaData = novaData + "/" + partesData[2]
-    return novaData
-}
 
 router.get('/caixa_do_dia', checarAdmin, (req, res) => {
     Receita.find().sort({ _id: "asc" }).lean().then((receitas) => {
@@ -81,19 +44,19 @@ router.get('/caixa_do_dia', checarAdmin, (req, res) => {
                     aux_receitas.tipo = "Despesa (-)"
                 }
 
-                aux_receitas.data = mascaraData(dataReceita)
-                aux_receitas.valor = mascaraDePreco(aux_receitas.valor)
+                aux_receitas.data = maskDateDDMMYYYY(dataReceita)
+                aux_receitas.valor = maskPrice(aux_receitas.valor)
                 receitas_hoje.push(aux_receitas)
             }
         }
 
         totalValor.saldo = totalValor.lucro - totalValor.despesa
 
-        total.lucro = mascaraDePreco(totalValor.lucro)
-        total.despesa = mascaraDePreco(totalValor.despesa)
-        total.saldo = mascaraDePreco(totalValor.saldo)
+        total.lucro = maskPrice(totalValor.lucro)
+        total.despesa = maskPrice(totalValor.despesa)
+        total.saldo = maskPrice(totalValor.saldo)
         
-        data_de_hoje = mascaraData(data_de_hoje)
+        data_de_hoje = maskDateDDMMYYYY(data_de_hoje)
         res.render("caixas/caixa_do_dia", {receitas: receitas_hoje, data_de_hoje: data_de_hoje, total: total, totalValor: totalValor})
 
 
@@ -195,19 +158,19 @@ router.post('/pesquisa', checarAdmin, (req, res) => {
                 total.despesa += aux_caixas.despesaTotal
                     
 
-                aux_caixas.data = mascaraData(data)
-                aux_caixas.lucroTotal = mascaraDePreco(aux_caixas.lucroTotal)
-                aux_caixas.despesaTotal = mascaraDePreco(aux_caixas.despesaTotal)
-                aux_caixas.saldoTotal = mascaraDePreco(aux_caixas.saldoTotal)
+                aux_caixas.data = maskDateDDMMYYYY(data)
+                aux_caixas.lucroTotal = maskPrice(aux_caixas.lucroTotal)
+                aux_caixas.despesaTotal = maskPrice(aux_caixas.despesaTotal)
+                aux_caixas.saldoTotal = maskPrice(aux_caixas.saldoTotal)
                 caixas_pesquisados.push(aux_caixas)
             }
         }
 
         total.saldo = total.lucro - total.despesa
         
-        total.lucro = mascaraDePreco(total.lucro)
-        total.despesa = mascaraDePreco(total.despesa)
-        total.saldo = mascaraDePreco(total.saldo)
+        total.lucro = maskPrice(total.lucro)
+        total.despesa = maskPrice(total.despesa)
+        total.saldo = maskPrice(total.saldo)
 
         var dia = dataInicialAuxiliar.getDate()
         var mes = dataInicialAuxiliar.getMonth()+1
@@ -218,8 +181,8 @@ router.post('/pesquisa', checarAdmin, (req, res) => {
         dataFim = dataFinal.getDate() + "-" + mes + "-" + dataFinal.getFullYear()
 
         var datas = {
-            dataInicial: mascaraData(dataInicio),
-            dataFinal: mascaraData(dataFim)
+            dataInicial: maskDateDDMMYYYY(dataInicio),
+            dataFinal: maskDateDDMMYYYY(dataFim)
         }
         
         res.render("caixas/buscaCaixa", {busca: true, caixas: caixas_pesquisados, total: total, datas: datas})

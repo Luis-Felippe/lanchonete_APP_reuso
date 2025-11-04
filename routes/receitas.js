@@ -4,45 +4,8 @@ const mongoose = require('mongoose')
 require('../models/Receita')
 const Receita = mongoose.model("receitas")
 const {checarAdmin} = require('../config/checarAdmin')
+const { maskPrice, maskDateDDMMYYYY } = require('../utils/formatters')
 const timezoneOffset = 180;
-
-function mascaraDePreco(preco) {
-    stringPreco = preco.toString().replace('.', ',')
-    var i = stringPreco.indexOf(",")
-    tamanho = stringPreco.length
-    var substringPreco
-    if(i == -1){
-        stringPreco = stringPreco.concat(",00")
-    }else{  
-        substringPreco = stringPreco.substr(i+1, tamanho)
-        if(substringPreco.length < 2){
-            stringPreco = stringPreco.concat("0")
-        }
-    }
-    return stringPreco
-}
-
-function mascaraData(data){
-    partesData = data.split("-")
-    var novaData
-    
-    if(partesData[0].length == 1){
-        novaData = "0" + partesData[0]
-    }else{
-        novaData = partesData[0]
-    }
-
-    novaData = novaData + "/"
-
-    if(partesData[1].length == 1){
-        novaData = novaData + "0" + partesData[1]         
-    }else{
-        novaData = novaData + partesData[1]
-    }
-
-    novaData = novaData + "/" + partesData[2]
-    return novaData
-}
 
 router.get('/novo', checarAdmin, (req, res) => {
     res.render("receitas/addReceita")
@@ -107,32 +70,32 @@ router.post('/pesquisa', checarAdmin, (req, res) => {
             mes = aux_receitas.data.getMonth() + 1
             ano = aux_receitas.data.getFullYear()
             dataDaReceita = dia+"-"+mes+"-"+ano
-            dataDaReceita = mascaraData(dataDaReceita)
+            dataDaReceita = maskDateDDMMYYYY(dataDaReceita)
 
             if(opcao == 0){
                 if(dataDaReceita.includes(busca)){
-                    aux_receitas.valor = mascaraDePreco(aux_receitas.valor)
+                    aux_receitas.valor = maskPrice(aux_receitas.valor)
                     aux_receitas.data = dataDaReceita
                     aux_receitas.tipo = (aux_receitas.tipo == 1) ? "Lucro (+)" : "Despesa (-)"
                     receitas_pesquisadas.push(aux_receitas)
                 }
             }else if(opcao == 1){
                 if(aux_receitas.descricao.toLowerCase().includes(busca)){
-                    aux_receitas.valor = mascaraDePreco(aux_receitas.valor)
+                    aux_receitas.valor = maskPrice(aux_receitas.valor)
                     aux_receitas.data = dataDaReceita
                     aux_receitas.tipo = (aux_receitas.tipo == 1) ? "Lucro (+)" : "Despesa (-)"
                     receitas_pesquisadas.push(aux_receitas)
                 }
             }else if(opcao == 2){
                 if(aux_receitas.tipo == 1){
-                    aux_receitas.valor = mascaraDePreco(aux_receitas.valor)
+                    aux_receitas.valor = maskPrice(aux_receitas.valor)
                     aux_receitas.data = dataDaReceita
                     aux_receitas.tipo = (aux_receitas.tipo == 1) ? "Lucro (+)" : "Despesa (-)"
                     receitas_pesquisadas.push(aux_receitas)
                 }
             }else if(opcao == 3){
                 if(aux_receitas.tipo == 0){
-                    aux_receitas.valor = mascaraDePreco(aux_receitas.valor)
+                    aux_receitas.valor = maskPrice(aux_receitas.valor)
                     aux_receitas.data = dataDaReceita
                     aux_receitas.tipo = (aux_receitas.tipo == 1) ? "Lucro (+)" : "Despesa (-)"
                     receitas_pesquisadas.push(aux_receitas)
@@ -153,8 +116,8 @@ router.post('/deletar', checarAdmin, (req, res) => {
     Receita.findOne({_id: req.body.id}).lean().then((receita) => {
         mes = receita.data.getMonth() + 1
         data = receita.data.getDate() + "-" + mes + "-" + receita.data.getFullYear()
-        receita.data = mascaraData(data) 
-        receita.valor = mascaraDePreco(receita.valor)
+        receita.data = maskDateDDMMYYYY(data) 
+        receita.valor = maskPrice(receita.valor)
         receita.tipo = (receita.tipo == 1) ? "Lucro (+)" : "Despesa (-)"
           
         res.render("receitas/deleteReceita", {receita: receita})

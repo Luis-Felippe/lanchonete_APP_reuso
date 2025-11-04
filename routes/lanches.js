@@ -4,23 +4,8 @@ const mongoose = require('mongoose')
 require('../models/Lanche')
 const Lanche = mongoose.model("lanches")
 const {checarAutenticacao} = require('../config/checarAutenticacao')
+const { maskPrice } = require('../utils/formatters')
 
-
-function mascaraDePreco(preco) {
-    stringPreco = preco.toString().replace('.', ',')
-    var i = stringPreco.indexOf(",")
-    tamanho = stringPreco.length
-    var substringPreco
-    if(i == -1){
-        stringPreco = stringPreco.concat(",00")
-    }else{  
-        substringPreco = stringPreco.substr(i+1, tamanho)
-        if(substringPreco.length < 2){
-            stringPreco = stringPreco.concat("0")
-        }
-    }
-    return stringPreco
-}
 
 router.get('/novo', checarAutenticacao, (req, res) => {
     res.render("lanches/addlanche")
@@ -102,7 +87,7 @@ router.get('/cardapio', (req, res) => {
         ctrl = false
         for(const aux of lanches){
             preco = aux.preco
-            preco = mascaraDePreco(preco)
+            preco = maskPrice(preco)
             if(ctrl){   
                novos_lanches.preco2 = preco
                ctrl = false
@@ -137,18 +122,18 @@ router.post('/pesquisa', checarAutenticacao, (req, res) => {
         for(const aux_lanches of lanches){
             if(opcao == 0){
                 if(aux_lanches.nome.toLowerCase().includes(busca)){
-                    aux_lanches.preco = mascaraDePreco(aux_lanches.preco)
+                    aux_lanches.preco = maskPrice(aux_lanches.preco)
                     novos_lanches.push(aux_lanches)
                 }
             }else if(opcao == 1){
                 floatBusca = parseFloat(busca)
                 if(aux_lanches.preco == floatBusca){
-                    aux_lanches.preco = mascaraDePreco(aux_lanches.preco)
+                    aux_lanches.preco = maskPrice(aux_lanches.preco)
                     novos_lanches.push(aux_lanches)
                 }
             }else if(opcao == 2){
                 if(aux_lanches.ingredientes.toLowerCase().includes(busca)){
-                    aux_lanches.preco = mascaraDePreco(aux_lanches.preco)
+                    aux_lanches.preco = maskPrice(aux_lanches.preco)
                     novos_lanches.push(aux_lanches)
                 }
             }    

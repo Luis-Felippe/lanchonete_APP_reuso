@@ -8,45 +8,11 @@ require('../models/Receita')
 const Pedido = mongoose.model("pedidos")
 const Lanche = mongoose.model("lanches")
 const Receita = mongoose.model("receitas")
+const { maskPrice, maskDateDDMMYYYY, adjustTimezone } = require('../utils/formatters')
+const { parseDescricao, parseExtras } = require('../utils/pedidoParser')
+const orderService = require('../services/orderService')
 const timezoneOffset = 180;
 
-function mascaraDePreco(preco) {
-    stringPreco = preco.toString().replace('.', ',')
-    var i = stringPreco.indexOf(",")
-    tamanho = stringPreco.length
-    var substringPreco
-    if (i == -1) {
-        stringPreco = stringPreco.concat(",00")
-    } else {
-        substringPreco = stringPreco.substr(i + 1, tamanho)
-        if (substringPreco.length < 2) {
-            stringPreco = stringPreco.concat("0")
-        }
-    }
-    return stringPreco
-}
-
-function mascaraData(data){
-    partesData = data.split("-")
-    var novaData
-    
-    if(partesData[0].length == 1){
-        novaData = "0" + partesData[0]
-    }else{
-        novaData = partesData[0]
-    }
-
-    novaData = novaData + "/"
-
-    if(partesData[1].length == 1){
-        novaData = novaData + "0" + partesData[1]         
-    }else{
-        novaData = novaData + partesData[1]
-    }
-
-    novaData = novaData + "/" + partesData[2]
-    return novaData
-}
 
 router.get('/novo', checarAutenticacao, (req, res) => {
     Lanche.find().sort({ chave: "asc" }).lean().then((lanches) => {
@@ -58,59 +24,8 @@ router.get('/novo', checarAutenticacao, (req, res) => {
 })
 
 router.post('/novoPedido', checarAutenticacao, (req, res) => {
-    var descricaoPedido = req.body.descricao_anterior
-    var extraPedido = req.body.extraPedido
-    var objDescricao = []
-    var objExtra = []
-    var cont = 1
-
-    if (descricaoPedido != "") {
-        var partesPedido = descricaoPedido.split(";")
-
-        for (const auxPedido of partesPedido) {
-            var parteDaPartesPedido = auxPedido.split("\\")
-            var auxDescricao
-
-            if (parteDaPartesPedido[5] == "") {
-                auxDescricao = {
-                    idDescricao: cont,
-                    idLanche: parteDaPartesPedido[0],
-                    nomeLanche: parteDaPartesPedido[1],
-                    tipoDePao: parteDaPartesPedido[2],
-                    subtotal: parteDaPartesPedido[3],
-                    quantidade: parteDaPartesPedido[4]
-                }
-            } else {
-                auxDescricao = {
-                    idDescricao: cont,
-                    idLanche: parteDaPartesPedido[0],
-                    nomeLanche: parteDaPartesPedido[1],
-                    tipoDePao: parteDaPartesPedido[2],
-                    subtotal: parteDaPartesPedido[3],
-                    quantidade: parteDaPartesPedido[4],
-                    observacoes: parteDaPartesPedido[5]
-                }
-            }
-            objDescricao.push(auxDescricao)
-            cont += 1
-        }
-    
-    }
-    cont = 1
-    if (extraPedido != "") {
-        var partesExtra = extraPedido.split("\\")
-        for (const auxExtra of partesExtra) {
-            var partesDaPartesExtra = auxExtra.split("&")
-            var auxExtraPedido
-            auxExtraPedido = {
-                idExtra: cont,
-                extra: partesDaPartesExtra[0],
-                valorExtra: parseFloat(partesDaPartesExtra[1])
-            }
-            objExtra.push(auxExtraPedido)
-            cont += 1
-        }
-    }
+    const objDescricao = parseDescricao(req.body.descricao_anterior)
+    const objExtra = parseExtras(req.body.extraPedido)
 
     let d = new Date();
     let data = new Date(d.valueOf() - timezoneOffset * 60000)
@@ -155,22 +70,22 @@ router.get('/pedidos_do_dia', checarAutenticacao, (req, res) => {
             if (data_aux == data_de_hoje) {
                 if(aux_pedidos.descricao){
                     for(var i = 0; i < aux_pedidos.descricao.length; i++){
-                        aux_pedidos.descricao[i].subtotal = mascaraDePreco(aux_pedidos.descricao[i].subtotal)
+                        aux_pedidos.descricao[i].subtotal = maskPrice(aux_pedidos.descricao[i].subtotal)
                     }
                 }
                 if(aux_pedidos.extra){
                     for(var i = 0; i < aux_pedidos.extra.length; i++){
-                        aux_pedidos.extra[i].valorExtra = mascaraDePreco(aux_pedidos.extra[i].valorExtra)
+                        aux_pedidos.extra[i].valorExtra = maskPrice(aux_pedidos.extra[i].valorExtra)
                     }
                 }
                 
-                aux_pedidos.total = mascaraDePreco(aux_pedidos.total)
+                aux_pedidos.total = maskPrice(aux_pedidos.total)
                 pedidos_hoje.push(aux_pedidos)
             }
         }
 
 
-        res.render("pedidos/pedidos_do_dia", {pedidos: pedidos_hoje, data_de_hoje: mascaraData(data_de_hoje)})
+        res.render("pedidos/pedidos_do_dia", {pedidos: pedidos_hoje, data_de_hoje: maskDateDDMMYYYY(data_de_hoje)})
 
 
     }).catch((err) => {
@@ -184,16 +99,16 @@ router.post('/deletar', checarAutenticacao, (req, res) => {
     Pedido.findOne({_id: req.body.id}).lean().then((pedido) => {
         const mes = pedido.data.getMonth() + 1
         const data = pedido.data.getDate() + "-" + mes + "-" + pedido.data.getFullYear()
-        pedido.data = mascaraData(data) 
-        pedido.total = mascaraDePreco(pedido.total)
+        pedido.data = maskDateDDMMYYYY(data) 
+        pedido.total = maskPrice(pedido.total)
         if(pedido.descricao){
             for(var i = 0; i < pedido.descricao.length; i++){
-                pedido.descricao[i].subtotal = mascaraDePreco(pedido.descricao[i].subtotal)
+                pedido.descricao[i].subtotal = maskPrice(pedido.descricao[i].subtotal)
             }    
         }
         if(pedido.extra){
             for(var i = 0; i < pedido.extra.length; i++){
-                pedido.extra[i].valorExtra = mascaraDePreco(pedido.extra[i].valorExtra)
+                pedido.extra[i].valorExtra = maskPrice(pedido.extra[i].valorExtra)
             }
         }
         res.render("pedidos/deletePedido", {pedido: pedido})
@@ -413,41 +328,41 @@ router.post('/pesquisa', checarAutenticacao, (req, res) => {
             mes = aux_pedidos.data.getMonth() + 1
             ano = aux_pedidos.data.getFullYear()
             dataDoPedido = dia+"-"+mes+"-"+ano
-            dataDoPedido = mascaraData(dataDoPedido)
+            dataDoPedido = maskDateDDMMYYYY(dataDoPedido)
 
             if(opcao == 0){   //Buscando por nome do cliente
                 if(aux_pedidos.cliente.toLowerCase().includes(busca)){
                     if(aux_pedidos.descricao){
                         for(var i = 0; i < aux_pedidos.descricao.length; i++){
-                            aux_pedidos.descricao[i].subtotal = mascaraDePreco(aux_pedidos.descricao[i].subtotal)
+                            aux_pedidos.descricao[i].subtotal = maskPrice(aux_pedidos.descricao[i].subtotal)
                         }    
                     }
     
                     if(aux_pedidos.extra){
                         for(var i = 0; i < aux_pedidos.extra.length; i++){
-                            aux_pedidos.extra[i].valorExtra = mascaraDePreco(aux_pedidos.extra[i].valorExtra)
+                            aux_pedidos.extra[i].valorExtra = maskPrice(aux_pedidos.extra[i].valorExtra)
                         }
                     }
 
                     aux_pedidos.data = dataDoPedido
-                    aux_pedidos.total = mascaraDePreco(aux_pedidos.total)
+                    aux_pedidos.total = maskPrice(aux_pedidos.total)
                     pedidos_pesquisados.push(aux_pedidos)
                 }
             }else if(opcao == 1){     //Buscando pela data do pedido
                 if(dataDoPedido.includes(busca)){
                     if(aux_pedidos.descricao){
                         for(var i = 0; i < aux_pedidos.descricao.length; i++){
-                            aux_pedidos.descricao[i].subtotal = mascaraDePreco(aux_pedidos.descricao[i].subtotal)
+                            aux_pedidos.descricao[i].subtotal = maskPrice(aux_pedidos.descricao[i].subtotal)
                         }    
                     }
     
                     if(aux_pedidos.extra){
                         for(var i = 0; i < aux_pedidos.extra.length; i++){
-                            aux_pedidos.extra[i].valorExtra = mascaraDePreco(aux_pedidos.extra[i].valorExtra)
+                            aux_pedidos.extra[i].valorExtra = maskPrice(aux_pedidos.extra[i].valorExtra)
                         }
                     }
                     aux_pedidos.data = dataDoPedido
-                    aux_pedidos.total = mascaraDePreco(aux_pedidos.total)
+                    aux_pedidos.total = maskPrice(aux_pedidos.total)
                     pedidos_pesquisados.push(aux_pedidos)
                 }
             }else if(opcao == 2){      //Buscando pelo preço total do pedido
@@ -455,17 +370,17 @@ router.post('/pesquisa', checarAutenticacao, (req, res) => {
                 if(busca_total == aux_pedidos.total){
                     if(aux_pedidos.descricao){
                         for(var i = 0; i < aux_pedidos.descricao.length; i++){
-                            aux_pedidos.descricao[i].subtotal = mascaraDePreco(aux_pedidos.descricao[i].subtotal)
+                            aux_pedidos.descricao[i].subtotal = maskPrice(aux_pedidos.descricao[i].subtotal)
                         }    
                     }
                     
                     if(aux_pedidos.extra){
                         for(var i = 0; i < aux_pedidos.extra.length; i++){
-                            aux_pedidos.extra[i].valorExtra = mascaraDePreco(aux_pedidos.extra[i].valorExtra)
+                            aux_pedidos.extra[i].valorExtra = maskPrice(aux_pedidos.extra[i].valorExtra)
                         }
                     }
                     aux_pedidos.data = dataDoPedido
-                    aux_pedidos.total = mascaraDePreco(aux_pedidos.total)
+                    aux_pedidos.total = maskPrice(aux_pedidos.total)
                     pedidos_pesquisados.push(aux_pedidos)
                 }
             }    
@@ -484,16 +399,16 @@ router.post('/concluir', checarAutenticacao, (req, res) => {
     Pedido.findOne({_id: req.body.id}).lean().then((pedido) => {
         const mes = pedido.data.getMonth() + 1
         const data = pedido.data.getDate() + "-" + mes + "-" + pedido.data.getFullYear()
-        pedido.data = mascaraData(data) 
-        pedido.total = mascaraDePreco(pedido.total)
+        pedido.data = maskDateDDMMYYYY(data) 
+        pedido.total = maskPrice(pedido.total)
         if(pedido.descricao){
             for(var i = 0; i < pedido.descricao.length; i++){
-                pedido.descricao[i].subtotal = mascaraDePreco(pedido.descricao[i].subtotal)
+                pedido.descricao[i].subtotal = maskPrice(pedido.descricao[i].subtotal)
             }    
         }
         if(pedido.extra){
             for(var i = 0; i < pedido.extra.length; i++){
-                pedido.extra[i].valorExtra = mascaraDePreco(pedido.extra[i].valorExtra)
+                pedido.extra[i].valorExtra = maskPrice(pedido.extra[i].valorExtra)
             }
         }
         res.render("pedidos/concluirPedido", {pedido: pedido})
@@ -503,41 +418,15 @@ router.post('/concluir', checarAutenticacao, (req, res) => {
     })
 })
 
-router.post('/concluirPedido', checarAutenticacao, (req, res) => {
-    Pedido.findOne({_id: req.body.id}).lean().then((pedido) => {
-        var novaReceita = {
-            data: pedido.data,
-            descricao: "Venda de sanduíches - " + pedido.cliente,
-            tipo: 1,  //Lucro
-            valor: pedido.total    
-        }
-        new Receita(novaReceita).save().then(() => {
-            //atualizando status do pedido
-            Pedido.updateOne({_id: req.body.id}, {$set:
-                {
-                    status: true
-                
-                }}).then(() => {
-                    req.flash("success_msg","Pedido Finalizado / Receita Adicionada")
-                    res.redirect("/home")
-                }).catch((err) => {
-                    req.flash("error_msg", "Erro interno ao atualizar o pedido")
-                    res.redirect("/home")
-                })
-
-
-        }).catch((err) => {
-            req.flash("error_msg", "Erro ao criar a receita")
-            res.redirect("/home")
-            console.log(err)
-        })
-        
-    }).catch((err) => {
-        req.flash("error_msg", "Erro ao concluir o pedido")
-        res.redirect("/pedidos/pedidos_do_dia")
-    })
-
-
+router.post('/concluirPedido', checarAutenticacao, async (req, res) => {
+    try {
+        await orderService.concludeOrder(req.body.id)
+        req.flash("success_msg","Pedido Finalizado / Receita Adicionada")
+        res.redirect("/home")
+    } catch (err) {
+        req.flash("error_msg", "Erro interno ao concluir o pedido")
+        res.redirect("/home")
+    }
 })
 
 module.exports = router
